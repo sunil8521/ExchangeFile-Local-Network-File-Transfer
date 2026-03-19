@@ -30,13 +30,14 @@ interface SocketData {
 
 const app = express();
 const server = createServer(app);
+const port = process.env.PORT || 4000 
 
 app.use(express.json());
 app.set("trust proxy", true);
 
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173","https://s362ttbl-3000.inc1.devtunnels.ms"],
+    origin: ["http://localhost:5173","https://s362ttbl-3000.inc1.devtunnels.ms","https://exchange-file.vercel.app"],
     methods:["GET","POST"],
     credentials:true
     
@@ -192,8 +193,7 @@ io.on("connection", (socket: Socket) => {
 
 // ---------------- START ----------------
 
-const PORT = 3000;
 
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+server.listen(port, () => {
+  console.log(`Server running on port ${port}`);
 });
