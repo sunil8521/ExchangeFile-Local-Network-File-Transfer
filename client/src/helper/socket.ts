@@ -1,8 +1,8 @@
 import { io, Socket } from "socket.io-client";
 import useStore from "../store/useStore";
-const SOCKET_URL = `http://${window.location.hostname}:4000`;
+// const SOCKET_URL = `http://${window.location.hostname}:4000`;
 
-// const SOCKET_URL = `https://exchangefile.onrender.com`;
+const SOCKET_URL = `https://exchangefile.onrender.com`;
 let socket: Socket | null = null;
 
 export const getSocket = (): Socket => {
