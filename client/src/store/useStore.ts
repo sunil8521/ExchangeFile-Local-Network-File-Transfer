@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import type { Socket } from "socket.io-client";
 
-/* ── Types ── */
 export interface Peer {
     id: string;
     name: string;
@@ -20,11 +19,9 @@ export interface IncomingRequest {
 
 
 interface StateType {
-    /* UI */
     isSidebarOpen: boolean;
     SetIsSidebarOpen: () => void;
 
-    /* Identity */
     deviceName: string;
     SetupDeviceName: (val: string) => void;
     hostDetails: {
@@ -35,7 +32,6 @@ interface StateType {
     } | null;
     connectionState: "connected" | "disconnected" | "connecting";
 
-    /* Peers */
     peers: Peer[];
 
     /* Logs */
@@ -61,13 +57,52 @@ interface StateType {
     cancelTransfer: () => void;
 }
 
-/* ── WebRTC config ── */
-const ICE_SERVERS: RTCConfiguration = {
+const METERED_API_KEY = import.meta.env.VITE_METERED_API_KEY || "3bba07ed460b32429b7f9a14c5eec50ff904";
+const METERED_API_URL = `https://sunilnb852.metered.live/api/v1/turn/credentials?apiKey=${METERED_API_KEY}`;
+
+// Default STUN-only config (used before/if TURN credentials fail)
+const DEFAULT_ICE_CONFIG: RTCConfiguration = {
     iceServers: [
-        { urls: "stun:stun.l.google.com:19302" },
-        { urls: "stun:stun1.l.google.com:19302" },
+        {
+            urls: [
+                "stun:stun.l.google.com:19302",
+                "stun:stun1.l.google.com:19302",
+            ],
+        },
     ],
 };
+
+// Cached ICE configuration with TURN servers
+let cachedIceConfig: RTCConfiguration | null = null;
+let fetchPromise: Promise<RTCConfiguration> | null = null;
+
+async function fetchTurnCredentials(): Promise<RTCConfiguration> {
+    try {
+        const response = await fetch(METERED_API_URL);
+        if (!response.ok) throw new Error(`Metered API error: ${response.status}`);
+        const iceServers = await response.json();
+        cachedIceConfig = {
+            iceServers: [
+                ...DEFAULT_ICE_CONFIG.iceServers!,
+                ...iceServers,
+            ],
+        };
+        console.log("✅ TURN credentials fetched from Metered");
+        return cachedIceConfig;
+    } catch (err) {
+        console.warn("⚠️ Failed to fetch TURN credentials, using STUN only:", err);
+        return DEFAULT_ICE_CONFIG;
+    }
+}
+
+async function getIceConfig(): Promise<RTCConfiguration> {
+    if (cachedIceConfig) return cachedIceConfig;
+    if (!fetchPromise) fetchPromise = fetchTurnCredentials();
+    return fetchPromise;
+}
+
+// Pre-fetch TURN credentials on module load
+fetchPromise = fetchTurnCredentials();
 
 /* Module-level refs (not serializable) */
 let peerConnection: RTCPeerConnection | null = null;
@@ -102,7 +137,6 @@ function cleanupPeerConnection() {
     receivedSize = 0;
 }
 
-/* ── Store ── */
 const useStore = create<StateType>((set, get) => ({
     isSidebarOpen: false,
     connectionState: "connecting",
@@ -147,7 +181,7 @@ const useStore = create<StateType>((set, get) => ({
 
 
     },
-    /* ── Socket listeners ── */
+
     SetupListeners: (socket: Socket) => {
         socketRef = socket;
 
@@ -221,7 +255,8 @@ const useStore = create<StateType>((set, get) => ({
             get().addLog("[CONNECT] Received WebRTC offer, creating answer...");
             // Receiver creates pc, sets remote, creates answer
             cleanupPeerConnection();
-            const pc = new RTCPeerConnection(ICE_SERVERS);
+            const iceConfig = await getIceConfig();
+            const pc = new RTCPeerConnection(iceConfig);
             peerConnection = pc;
 
             pc.onicecandidate = (event) => {
@@ -248,7 +283,7 @@ const useStore = create<StateType>((set, get) => ({
             socket.emit("answer", { to: from, answer });
         });
 
-        socket.on("answer", async ({ from, answer }: { from: string; answer: RTCSessionDescriptionInit }) => {
+        socket.on("answer", async ({ answer }: { from: string; answer: RTCSessionDescriptionInit }) => {
             get().addLog("[CONNECT] Received WebRTC answer, connection establishing...");
             if (peerConnection) {
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
@@ -334,7 +369,8 @@ async function createOfferAndSend(targetPeerId: string) {
     if (!socketRef) return;
     cleanupPeerConnection();
 
-    const pc = new RTCPeerConnection(ICE_SERVERS);
+    const iceConfig = await getIceConfig();
+    const pc = new RTCPeerConnection(iceConfig);
     peerConnection = pc;
 
     pc.onicecandidate = (event) => {

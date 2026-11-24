@@ -1,13 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
 import {
   Radio,
-  TerminalSquare,
   Laptop,
   Smartphone,
   FileArchive,
   X,
   Monitor,
-  Send,
   Check,
   Download,
   Loader2,
@@ -18,7 +16,6 @@ import { getSocket } from './helper/socket';
 import useStore from './store/useStore';
 import type { Peer } from './store/useStore';
 
-/* ── Helper: pick icon based on device type ── */
 function DeviceIcon({ type, size = 36 }: { type: string; size?: number }) {
   switch (type) {
     case "mobile": return <Smartphone size={size} strokeWidth={1.5} />;
@@ -27,7 +24,6 @@ function DeviceIcon({ type, size = 36 }: { type: string; size?: number }) {
   }
 }
 
-/* ── Helper: format file size ── */
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -67,7 +63,6 @@ function App() {
     SetupDeviceName(deviceName.trim());
   };
 
-  /* ── Send button clicked on a peer → open file picker ── */
   const handleSendClick = (peer: Peer) => {
     setSendToPeer(peer);
     fileInputRef.current?.click();
@@ -78,14 +73,12 @@ function App() {
     if (file && sendToPeer) {
       sendFileToPeer(sendToPeer.id, file);
     }
-    // Reset so the same file can be picked again
     e.target.value = '';
   };
 
   const isSenderModalOpen = transferStatus !== "idle" && selectedFile !== null;
   const isReceiverModalOpen = incomingRequest !== null;
 
-  /* ── Setup screen ── */
   if (!isSetupComplete) {
     return (
       <div className="flex flex-col h-[100dvh] items-center justify-center bg-zinc-950 text-zinc-50 font-sans selection:bg-zinc-800">
@@ -130,7 +123,6 @@ function App() {
       {/* Main Area */}
       <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
 
-        {/* LEFT SIDE (40%): Device Info */}
         {connectionState === "connecting" ? (
           <div className="w-full md:w-[40%] h-full flex flex-col items-center justify-center p-8 relative">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-white/[0.02] rounded-full blur-[100px] pointer-events-none"></div>
@@ -396,3 +388,6 @@ function App() {
 }
 
 export default App;
+
+
+
